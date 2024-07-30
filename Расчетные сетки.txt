@@ -1,0 +1,443 @@
+from tkinter import *
+from itertools import combinations
+from math import sqrt
+
+eps = 0.0001
+width_point = 1
+
+
+def PrCoords():
+    global coordinates
+    for i in coordinates:
+        canvas.create_rectangle(i[0], i[1], i[0] + width_point, i[1] + width_point, width=width_point)
+
+
+def PrRib(rib, canvas):
+    global coordinates
+    # z = coordinates[rib[0]][2] + coordinates[rib[1]][2]
+    grad = ''
+    # if 0 <= z <= 400:
+    #    grad = '#75c70e'
+    # elif 400 <= z <= 1000:
+    #    grad = '#06e92b'
+    # elif 1000 <= z <= 3000:
+    #    grad = '#d4e67e'
+    # elif 3000 <= z <= 6000:
+    #   grad = '#d4b007'
+    # else:
+    #    grad = '#7d6701'
+
+    canvas.create_line(coordinates[rib[0]][0], coordinates[rib[0]][1],
+                       coordinates[rib[1]][0], coordinates[rib[1]][1], width=1)
+
+
+def get_x_y(rib):
+    global coordinates
+    return coordinates[rib[0]][0], coordinates[rib[0]][1], coordinates[rib[1]][0], coordinates[rib[1]][1]
+
+
+def distance(rib):
+    # global coordinates
+    x1, y1, x2, y2 = get_x_y(rib)
+    """Считает длину отрезка по координатам начала и конца"""
+    return sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2)
+
+
+def distance_x_y(x1, y1, x2, y2):
+    # global coordinates
+    """Считает длину отрезка по координатам начала и конца"""
+    return sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2)
+
+
+def eq_eps(x, y):
+    return abs(x - y) <= eps
+
+
+def bool_intersect(rib1, rib2):
+    """Проверяет, пересекаются ли прямые. Случай, когда точкой пересечения являются концы отрезков (одна из вершин
+    многоугольника) пересечением не считаются. """
+    # global coordinates
+    x1, y1, x2, y2 = get_x_y(rib1)
+    x3, y3, x4, y4 = get_x_y(rib2)
+    if min(x1, x2) <= max(x3, x4) and min(y3, y4) <= max(y1, y2) and min(x3, x4) <= max(x1, x2) and min(y1, y2) <= max(
+            y3, y4):
+        if ((x1 == x3) and (y1 == y3)) or ((x2 == x4) and (y2 == y4)) or ((x1 == x4) and (y1 == y4)) or (
+                (x2 == x3) and (y2 == y3)):
+            return False
+        if x1 == x2 and x3 == x4 and x1 == x3:
+            return True
+        if x1 == x2 or x3 == x4:
+            if x1 == x2:
+                k2 = (y3 - y4) / (x3 - x4)
+                b2 = (y3 - k2 * x3)
+                y = k2 * x1 + b2
+                if min(y1, y2) < y < max(y1, y2):
+                    return True
+                else:
+                    return False
+            k1 = (y1 - y2) / (x1 - x2)
+            b1 = (y1 - k1 * x1)
+            y = k1 * x1 + b1
+            if min(y3, y4) + eps < y < max(y3, y4) + eps:
+                return True
+            else:
+                return False
+        k1 = (y1 - y2) / (x1 - x2)
+        b1 = (y1 - k1 * x1)
+        k2 = (y3 - y4) / (x3 - x4)
+        b2 = (y3 - k2 * x3)
+        if (eq_eps(k1, k2) or k1 == k2) and (eq_eps(b1, b2) or b1 == b2):
+            return True
+        if eq_eps(k1, k2) or k1 == k2:
+            return False
+        x = (b2 - b1) / (k1 - k2)
+        if min(x1, x2) < x < max(x1, x2) and min(x3, x4) < x < max(x3, x4):
+            return True
+        else:
+            return False
+    else:
+        return False
+
+
+def compression(x1, y1, x2, y2, x3, y3, n):
+    global canvas
+    if n == 3:
+        return
+    n += 1
+    x = (x1 + x2 + x3) / 3
+    y = (y1 + y2 + y3) / 3
+    coordinates.append([x, y])
+    compression(x1, y1, x2, y2, x, y, n)
+    compression(x1, y1, x3, y3, x, y, n)
+    compression(x2, y2, x3, y3, x, y, n)
+
+
+def save_cord(event):
+    """Сохраняет координаты, проставленные при помощи ЛКМ."""
+    global loops, ribs, nodes, tri
+    n1 = int(txt1.get())
+    n2 = int(txt2.get())
+    n3 = int(txt3.get())
+    n = n1 + n2 + n3
+    coordinates.append([event.x, event.y])
+    canvas.create_rectangle(event.x, event.y, event.x + width_point, event.y + width_point, width=width_point)
+    loops += 1
+    if loops == n1:
+        for i in range(n1):
+            canvas.create_line(coordinates[i - 1][0], coordinates[i - 1][1], coordinates[i][0], coordinates[i][1])
+    if loops == n1 + n2:
+        ribs = tri_with_2(coordinates, [])
+        nodes = nod(ribs)
+        tri = trig(ribs)
+        for i in ribs:
+            PrRib(i, canvas)
+    if n1 + n2 < loops <= n1 + n2 + n3:
+        x0 = event.x
+        y0 = event.y
+        canvas.create_rectangle(x0, y0, x0 + 1, y0 + 1, fill="blue", width=width_point)
+        x1, y1, x2, y2, x3, y3 = find_tri(x0, y0)
+        compression(x1, y1, x2, y2, x3, y3, 0)
+        PrCoords()
+
+def find_tri(x0, y0):
+    global ribs, nodes, tri, canvas
+    for i in tri:
+        x1 = nodes[ribs[i[0]][0]][0]
+        y1 = nodes[ribs[i[0]][0]][1]
+        x2 = nodes[ribs[i[0]][1]][0]
+        y2 = nodes[ribs[i[0]][1]][1]
+        x3 = nodes[ribs[i[1]][0]][0]
+        y3 = nodes[ribs[i[1]][0]][1]
+        if (x1 == x3 and y1 == y3) or (x2 == x3 and y2 == y3):
+            x3 = nodes[ribs[i[1]][1]][0]
+            y3 = nodes[ribs[i[1]][1]][1]
+        a = (x1 - x0) * (y2 - y1) - (x2 - x1) * (y1 - y0)
+        b = (x2 - x0) * (y3 - y2) - (x3 - x2) * (y2 - y0)
+        c = (x3 - x0) * (y1 - y3) - (x1 - x3) * (y3 - y0)
+        if (a >= 0 and b >= 0 and c >= 0) or (a <= 0 and b <= 0 and c <= 0):
+            for j in i:
+                canvas.create_line(coordinates[ribs[j][0]][0], coordinates[ribs[j][0]][1],
+                                   coordinates[ribs[j][1]][0], coordinates[ribs[j][1]][1], fill="blue", width=2)
+            return x1, y1, x2, y2, x3, y3
+
+
+def tri_with_2(cords, base_ribs):
+    ribs = []
+    const_ribs = list(combinations(range(len(cords)), 2))
+    const_ribs.sort(key=lambda r: distance(r))
+    const_ribs = base_ribs + const_ribs
+    ribs.append(list(const_ribs[0]))
+    for i in const_ribs[1::]:
+        check = True
+        for j in ribs:
+            if bool_intersect(i, j) or (j[0] == i[0] and j[1] == i[1]) or (j[0] == i[1] and j[1] == i[0]):
+                check = False
+                break
+        if check:
+            ribs.append(i)
+    return ribs
+
+
+def nod(ribs):
+    global coordinates
+    nodes = coordinates
+    for i in range(len(ribs)):
+        if len(nodes[ribs[i][0]]) < 4:
+            nodes[ribs[i][0]].append(1)
+        else:
+            nodes[ribs[i][0]][1] += 1
+        nodes[ribs[i][0]].append(i)
+        if len(nodes[ribs[i][1]]) < 4:
+            nodes[ribs[i][1]].append(1)
+        else:
+            nodes[ribs[i][1]][1] += 1
+        nodes[ribs[i][1]].append(i)
+    return nodes
+
+
+def trig(ribs):
+    tri = []
+    for i in range(len(ribs)):
+        for j in range(len(ribs)):
+            for k in range(len(ribs)):
+                if ribs[i] == ribs[j]:
+                    break
+                if ribs[i] == ribs[k] or ribs[j] == ribs[k]:
+                    continue
+                if (ribs[i][0] == ribs[j][0] and ((ribs[j][1] == ribs[k][0] and ribs[i][1] == ribs[k][1]) or (
+                        ribs[j][1] == ribs[k][1] and ribs[i][1] == ribs[k][0]))) or (
+                        ribs[i][0] == ribs[j][1] and (
+                        (ribs[j][0] == ribs[k][0] and ribs[i][1] == ribs[k][1]) or (
+                        ribs[j][0] == ribs[k][1] and ribs[i][1] == ribs[k][0]))):
+                    flag = True
+                    for z in tri:
+                        if (i == z[0] or i == z[1] or i == z[2]) and (j == z[0] or j == z[1] or j == z[2]) and (
+                                (k == z[0] or k == z[1] or k == z[2])
+                        ):
+                            flag = False
+                            break
+                    if flag:
+                        tri.append([i, j, k])
+    return tri
+
+
+x_window = 800
+y_window = 800
+coordinates = []
+ribs = []
+nodes = []
+tri = []
+loops = 0
+n1 = 7
+n2 = 4
+n = n1 + n2
+window = Tk()
+txt1 = Entry(window, width=20)
+txt1.grid(column=1, row=0)
+l1 = Label(window, text="n1:")
+l1.grid(column=0, row=0)
+
+txt2 = Entry(window, width=20)
+txt2.grid(column=1, row=1)
+l2 = Label(window, text="n2:")
+l2.grid(column=0, row=1)
+
+txt3 = Entry(window, width=20)
+txt3.grid(column=1, row=2)
+l3 = Label(window, text="n3:")
+l3.grid(column=0, row=2)
+canvas = Canvas(window, width=x_window, height=y_window, bg='white')
+canvas.grid(column=0, row=3)
+canvas.bind("<Button-1>", save_cord)
+window.mainloop()
+
+
+
+Модификация 2
+import random
+from tkinter import *
+from tkinter import messagebox
+from itertools import combinations
+from math import sqrt
+
+eps = 0.0001
+width_point = 1
+
+
+def PrCoords():
+    global coordinates
+    for i in coordinates:
+        canvas.create_rectangle(i[0], i[1], i[0] + width_point, i[1] + width_point, width=width_point)
+
+
+def PrRib(rib, canvas):
+    global coordinates
+    z = coordinates[rib[0]][2] + coordinates[rib[1]][2]
+    # print(z)
+    grad = ''
+    if 0 <= z <= 400:
+        grad = '#75c70e'
+    elif 400 <= z <= 1000:
+        grad = '#06e92b'
+    elif 1000 <= z <= 3000:
+        grad = '#d4e67e'
+    elif 3000 <= z <= 6000:
+        grad = '#d4b007'
+    else:
+        grad = '#7d6701'
+
+    canvas.create_line(coordinates[rib[0]][0], coordinates[rib[0]][1],
+                       coordinates[rib[1]][0], coordinates[rib[1]][1], fill=grad, width=1)
+
+
+def get_x_y(rib):
+    global coordinates
+    return coordinates[rib[0]][0], coordinates[rib[0]][1], coordinates[rib[1]][0], coordinates[rib[1]][1]
+
+
+def distance(rib):
+    # global coordinates
+    x1, y1, x2, y2 = get_x_y(rib)
+    """Считает длину отрезка по координатам начала и конца"""
+    return sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2)
+
+
+def eq_eps(x, y):
+    return abs(x - y) <= eps
+
+
+def bool_intersect(rib1, rib2):
+    """Проверяет, пересекаются ли прямые. Случай, когда точкой пересечения являются концы отрезков (одна из вершин
+    многоугольника) пересечением не считаются. """
+    # global coordinates
+    x1, y1, x2, y2 = get_x_y(rib1)
+    x3, y3, x4, y4 = get_x_y(rib2)
+    if min(x1, x2) <= max(x3, x4) and min(y3, y4) <= max(y1, y2) and min(x3, x4) <= max(x1, x2) and min(y1, y2) <= max(
+            y3, y4):
+        if ((x1 == x3) and (y1 == y3)) or ((x2 == x4) and (y2 == y4)) or ((x1 == x4) and (y1 == y4)) or (
+                (x2 == x3) and (y2 == y3)):
+            return False
+        if x1 == x2 and x3 == x4 and x1 == x3:
+            return True
+        if x1 == x2 or x3 == x4:
+            if x1 == x2:
+                k2 = (y3 - y4) / (x3 - x4)
+                b2 = (y3 - k2 * x3)
+                y = k2 * x1 + b2
+                if min(y1, y2) < y < max(y1, y2):
+                    return True
+                else:
+                    return False
+            k1 = (y1 - y2) / (x1 - x2)
+            b1 = (y1 - k1 * x1)
+            y = k1 * x1 + b1
+            if min(y3, y4) + eps < y < max(y3, y4) + eps:
+                return True
+            else:
+                return False
+        k1 = (y1 - y2) / (x1 - x2)
+        b1 = (y1 - k1 * x1)
+        k2 = (y3 - y4) / (x3 - x4)
+        b2 = (y3 - k2 * x3)
+        if (eq_eps(k1, k2) or k1 == k2) and (eq_eps(b1, b2) or b1 == b2):
+            return True
+        if eq_eps(k1, k2) or k1 == k2:
+            return False
+        x = (b2 - b1) / (k1 - k2)
+        if min(x1, x2) < x < max(x1, x2) and min(x3, x4) < x < max(x3, x4):
+            return True
+        else:
+            return False
+    else:
+        return False
+
+
+def compression(x1, y1, x2, y2, x3, y3, n):
+    global canvas
+    if n == 3:
+        return
+    n += 1
+    x = (x1 + x2 + x3) / 3
+    y = (y1 + y2 + y3) / 3
+    coordinates.append([x, y])
+    # canvas.create_line(x1, y1, x2, y2)
+    # canvas.create_line(x3, y3, x2, y2)
+    # canvas.create_line(x1, y1, x3, y3)
+    # canvas.create_line(x1, y1, x, y)
+    # canvas.create_line(x2, y2, x, y)
+    # canvas.create_line(x3, y3, x, y)
+    compression(x1, y1, x2, y2, x, y, n)
+    compression(x1, y1, x3, y3, x, y, n)
+    compression(x2, y2, x3, y3, x, y, n)
+
+
+def save_cord(event):
+    """Сохраняет координаты, проставленные при помощи ЛКМ."""
+    global n, loops
+    coordinates.append([event.x, event.y])
+    canvas.create_rectangle(event.x, event.y, event.x + width_point, event.y + width_point, width=width_point)
+    loops += 1
+    if loops == n:
+        print(len(coordinates), coordinates)
+        x = 0
+        y = 0
+        for i in coordinates:
+            x += i[0]
+            y += i[1]
+        x = int(x / len(coordinates))
+        y = int(y / len(coordinates))
+        canvas.create_rectangle(x, y, x + width_point, y + width_point, width=width_point)
+
+        for i in range(len(coordinates)):
+            compression(coordinates[i][0], coordinates[i][1], coordinates[i - 1][0], coordinates[i - 1][1], x, y, 0)
+        # compression(coordinates[0][0], coordinates[0][1], coordinates[-1][0], coordinates[-1][1], x, y, 0)
+        coordinates.append([x, y])
+        PrCoords()
+        global ribs
+        ribs, nodes = tri_with_2(coordinates, [])
+        print(len(coordinates), coordinates)
+        print(len(nodes), nodes)
+        for i in ribs:
+            PrRib(i, canvas)
+
+
+def tri_with_2(cords, base_ribs):
+    ribs = []
+    const_ribs = list(combinations(range(len(cords)), 2))
+    const_ribs.sort(key=lambda r: distance(r))
+    const_ribs = base_ribs + const_ribs
+    ribs.append(list(const_ribs[0]))
+    for i in const_ribs[1::]:
+        check = True
+        for j in ribs:
+            if bool_intersect(i, j) or (j[0] == i[0] and j[1] == i[1]) or (j[0] == i[1] and j[1] == i[0]):
+                check = False
+                break
+        if check:
+            ribs.append(i)
+    nodes = cords
+    for i in range(len(ribs)):
+        if len(nodes[ribs[i][0]]) < 4:
+            nodes[ribs[i][0]].append(1)
+        else:
+            nodes[ribs[i][0]][1] += 1
+        nodes[ribs[i][0]].append(i)
+        if len(nodes[ribs[i][1]]) < 4:
+            nodes[ribs[i][1]].append(1)
+        else:
+            nodes[ribs[i][1]][1] += 1
+        nodes[ribs[i][1]].append(i)
+    return ribs, nodes
+
+
+x_window = 800
+y_window = 800
+coordinates = []
+ribs = []
+loops = 0
+n = 7
+window = Tk()
+canvas = Canvas(window, width=x_window, height=y_window, bg='white')
+canvas.pack()
+canvas.bind("<Button-1>", save_cord)
+window.mainloop()
